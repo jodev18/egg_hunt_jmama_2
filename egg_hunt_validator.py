@@ -1,7 +1,9 @@
-# from PIL import Image
-# from PIL.ExifTags import TAGS
+from PIL import Image
+from PIL.ExifTags import TAGS
 import os
-import pyexiv2
+import stat
+import time
+
 
 def list_files(folder_path):
     try:
@@ -14,23 +16,40 @@ def list_files(folder_path):
 
 
 def get_image_metadata(image_path):
-    metadata = pyexiv2.ImageMetadata('test.jpg')
-    metadata.read()
+    # Get file statistics
+    file_stat = os.stat(image_path)
 
-    # try:
-    #     with Image.open(image_path) as img:
-    #         metadata = {}
-    #         exif_data = img._getexif()
-    #
-    #         if exif_data is not None:
-    #             for tag, value in exif_data.items():
-    #                 tag_name = TAGS.get(tag, tag)
-    #                 metadata[tag_name] = value
-    #
-    #         return metadata
-    # except Exception as e:
-    #     print(f"Error: {e}")
-    #     return None
+    # Extract basic file metadata
+    metadata = {
+        "File Path": image_path,
+        "Size (bytes)": file_stat.st_size,
+        "Mode": stat.filemode(file_stat.st_mode),
+        "Owner UID": file_stat.st_uid,
+        "Group GID": file_stat.st_gid,
+        "Last Access Time": time.ctime(file_stat.st_atime),
+        "Last Modification Time": time.ctime(file_stat.st_mtime),
+        "Creation Time": time.ctime(file_stat.st_ctime)
+    }
+
+    try:
+        # Open the image file
+        with Image.open(image_path) as img:
+            # Extract image-specific metadata
+            exif_data = img.getexif()
+            image_metadata = {
+                "Image Format": img.format,
+                "Image Size": img.size,
+                "Color Mode": img.mode,
+                "Exif Data": "\n".join([f"{TAGS[key]}: {exif_data[key]}" for key in exif_data if key in TAGS and exif_data[key] is not None])
+            }
+
+            # Update the metadata dictionary with image-specific metadata
+            metadata.update(image_metadata)
+
+    except Exception as e:
+        print(f"Error extracting image metadata: {e}")
+
+    return metadata
 
 
 file_list = list_files('egg_hunt_images_tish')
@@ -39,8 +58,8 @@ print(file_list)
 for item in file_list:
 
     image_path = item
-    get_image_metadata('egg_hunt_images_tish/' + item)
+    metadata = get_image_metadata('egg_hunt_images_tish/' + item)
 
-    # print("Image Metadata:")
-    # for key, value in metadata.items():
-    #     print(f"{key}: {value}")
+    print("Image Metadata:")
+    for key, value in metadata.items():
+        print(f"{key}: {value}")
